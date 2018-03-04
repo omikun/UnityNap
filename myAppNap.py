@@ -15,8 +15,8 @@ import signal
 try:
     from AppKit import NSWorkspace
 except ImportError:
-    print "Can't import AppKit -- maybe you're running python from brew?"
-    print "Try running with Apple's /usr/bin/python instead."
+    print("Can't import AppKit -- maybe you're running python from brew?")
+    print("Try running with Apple's /usr/bin/python instead.")
     exit(1)
 
 def get_pid(name):
@@ -24,8 +24,8 @@ def get_pid(name):
         result = subprocess.check_output(['pgrep '+name], shell=True)
         return result.strip().split('\n')
     except:
-        print '''Invalid app name, will not suspend/resume anything
-        Will monitor apps in focus, switch to your desired app to see valid name'''
+        print('''Invalid app name, will not suspend/resume anything
+        Will monitor apps in focus, switch to your desired app to see valid name''')
         return None
 
 # if script invoked with an argument, use that as the pid
@@ -33,14 +33,14 @@ desiredApp = 'asfjsadfjasdflkjasf'
 if len(sys.argv) > 1:
     da = sys.argv[1]
     if da == 'Terminal':
-        print 'Can\'t suspend Terminal, especially if you are calling from Terminal'
+        print('Can\'t suspend Terminal, especially if you are calling from Terminal')
     else:
         desiredApp = da
 
 pids = get_pid(desiredApp)
 
 if pids:
-    print "Monitoring %s, with PIDs: %s" % (desiredApp, pids) 
+    print("Monitoring %s, with PIDs: %s" % (desiredApp, pids))
 
 try:
     last_active_app = None
