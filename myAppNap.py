@@ -5,6 +5,8 @@ The applications are polled every second.
 """
 from __future__ import print_function
 
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -19,6 +21,8 @@ except ImportError:
 
 def get_pids(name):
     try:
+        # XXX: I've removed `shell=True` here. You should verify that
+        # it still works, seeing as I sadly can't test anything on OSX.
         result = subprocess.check_output(["pgrep", name])
         return result.strip().splitlines()
     except:
@@ -28,40 +32,6 @@ def get_pids(name):
               "switch to your desired app to see valid name",
               sep="\n")
         return None
-
-
-def continue_pids(pids):
-    # We need to make sure that each process continues correctly, so we
-    # store a list of the `kill` processes to make sure they complete
-    # later.
-    processes = []
-    for pid in pids:
-        process = subprocess.Popen(["kill", "-CONT", pid])
-        processes.append((pid, process))
-
-    for (pid, process) in processes:
-        returncode = process.wait()
-
-        if returncode != 0:
-            print("Process", pid, "did not continue properly.",
-                  "It exited with the status code:", returncode)
-
-
-def stop_pids(pids):
-    # The code here is mostly duplicated from `continue_pids`. I just
-    # copy-pasted for clarity, but it might be smart to create a separate
-    # function.
-    processes = []
-    for pid in pids:
-        process = subprocess.Popen(["kill", "-STOP", pid])
-        processes.append((pid, process))
-
-    for (pid, process) in processes:
-        returncode = process.wait()
-
-        if returncode != 0:
-            print("Process", pid, "did not continue properly.",
-                  "It exited with the status code:", returncode)
 
 
 def monitor_apps(desired_app, pids):
@@ -78,10 +48,12 @@ def monitor_apps(desired_app, pids):
 
             if last_active_app == desired_app:
                 is_stopped = True
-                continue_pids(pids)
+                for pid in pids:
+                    os.kill(pid, signal.SIGCONT)
             elif is_stopped:
                 is_stopped = False
-                stop_pids(pids)
+                for pid in pids:
+                    os.kill(pid, signal.SIGSTOP)
 
         time.sleep(1)
 
@@ -110,10 +82,9 @@ def main():
         print()
         print("Resuming", desired_app)
 
-        continue_pids(pids)
+        for pid in pids:
+            os.kill(pid, signal.SIGCONT)
 
 
 if __name__ == "__main__":
-    # XXX: I've removed `shell=True` in a few calls. You should verify that
-    # it still works, seeing as I sadly can't test anything on OSX.
     main()
