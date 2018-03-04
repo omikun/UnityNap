@@ -29,15 +29,13 @@ def get_pid(name):
         return None
 
 # if script invoked with an argument, use that as the pid
-desiredApp = 'asfjsadfjasdflkjasf'
 if len(sys.argv) > 1:
     da = sys.argv[1]
     if da == 'Terminal':
         print 'Can\'t suspend Terminal, especially if you are calling from Terminal'
     else:
         desiredApp = da
-
-pids = get_pid(desiredApp)
+        pids = get_pid(desiredApp)
 
 if pids:
     print "Monitoring %s, with PIDs: %s" % (desiredApp, pids) 
