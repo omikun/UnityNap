@@ -42,6 +42,12 @@ def monitor_apps(desired_app, pids):
         active_app = NSWorkspace.sharedWorkspace().activeApplication()
         active_app_name = active_app["NSApplicationName"]
 
+        # We only want to check if something is an `unicode` if we're in
+        # Python 2. Python 3 doesn't have this distinction anymore.
+        if sys.version_info.major < 3 and isinstance(active_app_name, unicode):
+            # XXX: We might not want to ignore errors.
+            active_app_name = active_app_name.encode("utf8", "ignore")
+
         if last_active_app != active_app_name:
             last_active_app = active_app_name
             print("Currently focused on", last_active_app)
