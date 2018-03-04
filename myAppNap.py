@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 """
 Automatically suspend applications which are not in focus.
 The applications are polled every second.
@@ -42,9 +42,7 @@ def monitor_apps(desired_app, pids):
         active_app = NSWorkspace.sharedWorkspace().activeApplication()
         active_app_name = active_app["NSApplicationName"]
 
-        # We only want to check if something is an `unicode` if we're in
-        # Python 2. Python 3 doesn't have this distinction anymore.
-        if sys.version_info.major < 3 and isinstance(active_app_name, unicode):
+        if isinstance(active_app_name, unicode):
             # XXX: We might not want to ignore errors.
             active_app_name = active_app_name.encode("utf8", "ignore")
 
@@ -66,7 +64,7 @@ def monitor_apps(desired_app, pids):
 
 def main():
     if len(sys.argv) < 2:
-        print("USAGE: python myAppNap.py APPLICATION")
+        print("USAGE: /usr/bin/python2 myAppNap.py APPLICATION")
         sys.exit(1)
 
     desired_app = sys.argv[1]
@@ -77,6 +75,8 @@ def main():
     pids = get_pids(desired_app)
     if pids:
         print("Monitoring %s, with PIDs: %s" % (desired_app, pids))
+    else:
+        pids = []
 
     try:
         monitor_apps(desired_app, pids)
