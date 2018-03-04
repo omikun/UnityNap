@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """
 Automatically suspend applications which are not in focus.
 The applications are polled every second.
