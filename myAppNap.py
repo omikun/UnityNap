@@ -1,70 +1,119 @@
-#!/usr/bin/python                                                                                            
+#!/usr/bin/python
+"""
+Automatically suspend applications which are not in focus.
+The applications are polled every second.
+"""
+from __future__ import print_function
 
-''' This script automatically finds PIDs for desiredApp
-    and suspend those processes whenever desired app  is not in focus. 
-    This script is meant to stay running and polls window focus every 1 second
-    On receiving keyboard interrupt, will resume
-'''
-from datetime import datetime
-from time import sleep
-import sys
 import subprocess
+import sys
+import time
 
 try:
     from AppKit import NSWorkspace
 except ImportError:
-    print "Can't import AppKit -- maybe you're running python from brew?"
-    print "Try running with Apple's /usr/bin/python instead."
-    exit(1)
+    print("Can't import AppKit -- maybe you're running python from brew?")
+    print("Try running with Apple's /usr/bin/python instead.")
+    sys.exit(1)
 
-def get_pid(name):
+
+def get_pids(name):
     try:
-        result = subprocess.check_output(['pgrep '+name], shell=True)
-        return result.strip().split('\n')
+        result = subprocess.check_output(["pgrep", name])
+        return result.strip().splitlines()
     except:
-        print '''Invalid app name, will not suspend/resume anything
-        Will monitor apps in focus, switch to your desired app to see valid name'''
+        # XXX: You should specify the exception type here.
+        print("Invalid app name, will not suspend/resume anything",
+              "Will monitor apps in focus, "
+              "switch to your desired app to see valid name",
+              sep="\n")
         return None
 
-# if script invoked with an argument, use that as the pid
-desiredApp = 'asfjsadfjasdflkjasf'
-if len(sys.argv) > 1:
-    da = sys.argv[1]
-    if da == 'Terminal':
-        print 'Can\'t suspend Terminal, especially if you are calling from Terminal'
-    else:
-        desiredApp = da
 
-pids = get_pid(desiredApp)
+def continue_pids(pids):
+    # We need to make sure that each process continues correctly, so we
+    # store a list of the `kill` processes to make sure they complete
+    # later.
+    processes = []
+    for pid in pids:
+        process = subprocess.Popen(["kill", "-CONT", pid])
+        processes.append((pid, process))
 
-if pids:
-    print "Monitoring %s, with PIDs: %s" % (desiredApp, pids) 
+    for (pid, process) in processes:
+        returncode = process.wait()
 
-try:
+        if returncode != 0:
+            print("Process", pid, "did not continue properly.",
+                  "It exited with the status code:", returncode)
+
+
+def stop_pids(pids):
+    # The code here is mostly duplicated from `continue_pids`. I just
+    # copy-pasted for clarity, but it might be smart to create a separate
+    # function.
+    processes = []
+    for pid in pids:
+        process = subprocess.Popen(["kill", "-STOP", pid])
+        processes.append((pid, process))
+
+    for (pid, process) in processes:
+        returncode = process.wait()
+
+        if returncode != 0:
+            print("Process", pid, "did not continue properly.",
+                  "It exited with the status code:", returncode)
+
+
+def monitor_apps(desired_app, pids):
     last_active_app = None
-    stop = True
+    is_stopped = True
+
     while True:
         active_app = NSWorkspace.sharedWorkspace().activeApplication()
-        if last_active_app != active_app['NSApplicationName']:
-            last_active_app = active_app['NSApplicationName']
-            print "Currently focused on", last_active_app
-            if last_active_app == desiredApp:
-                stop = True
-                if pids:
-                    print "Continuing", desiredApp
-                    for pid in pids:
-                        subprocess.Popen("kill -CONT " + pid, shell=True)
-            elif stop:
-                stop = False
-                if pids:
-                    print "Stopping", desiredApp
-                    for pid in pids:
-                        subprocess.Popen("kill -STOP " + pid, shell=True)
-        sleep(1)
-except KeyboardInterrupt:
-    print '\nExiting script'
+        active_app_name = active_app["NSApplicationName"]
+
+        if last_active_app != active_app_name:
+            last_active_app = active_app_name
+            print("Currently focused on", last_active_app)
+
+            if last_active_app == desired_app:
+                is_stopped = True
+                continue_pids(pids)
+            elif is_stopped:
+                is_stopped = False
+                stop_pids(pids)
+
+        time.sleep(1)
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("USAGE: python myAppNap.py APPLICATION")
+        sys.exit(1)
+
+    desired_app = sys.argv[1]
+    if desired_app == "Terminal":
+        print("Can't suspend Terminal, "
+              "especially if you are calling from Terminal")
+
+    pids = get_pids(desired_app)
     if pids:
-        print '\nResuming %s' % desiredApp
-        for pid in pids:
-            subprocess.Popen("kill -CONT " + pid, shell=True)
-    sys.exit()
+        print("Monitoring %s, with PIDs: %s" % (desired_app, pids))
+
+    try:
+        monitor_apps(desired_app, pids)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        print()
+        print("Exiting script")
+        print()
+        print("Resuming", desired_app)
+
+        continue_pids(pids)
+
+
+if __name__ == "__main__":
+    # XXX: I've removed `shell=True` in a few calls. You should verify that
+    # it still works, seeing as I sadly can't test anything on OSX.
+    main()
