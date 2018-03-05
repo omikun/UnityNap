@@ -1,14 +1,16 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-import time
-import sys
-import subprocess
+
+import logging
 import os
 import signal
-import logging
-import rumps
+import subprocess
+import sys
+import time
 from threading import Thread
+
+import rumps
 
 try:
     from AppKit import NSWorkspace
@@ -40,16 +42,19 @@ def get_pids(app):
         pass
     return pids
 
-SUSPENDED = set()  #set of PIDs that has been suspended
-DONT_SUSPEND_NAME = ('Terminal', 'Activity Monitor') #set of apps to never suspend/resume
+SUSPENDED = set()  # set of PIDs that has been suspended
+DONT_SUSPEND_NAME = ('Terminal', 'Activity Monitor') # set of apps to never suspend/resume
 
 def name_of(app):
     if app is None:
         return None
     app_name = app['NSApplicationName']
-    if sys.version_info.major < 3 and isinstance(app_name, unicode):
-        # TODO handle errors instead of ignoring them
-        app_name = app_name.encode("utf8", "ignore")
+    try:               # Python 2
+        if isinstance(app_name, unicode):
+            # TODO handle errors instead of ignoring them
+            app_name = app_name.encode("utf8", "ignore")
+    except NameError:  # Python 3
+        pass
     return app_name
 
 def suspend(prev_app):
@@ -65,7 +70,7 @@ def suspend(prev_app):
 
 def resume(app):
     'Resume apps that have been suspended and arent on the do not suspend list'
-    if name_of(app) in DONT_SUSPEND_NAME: 
+    if name_of(app) in DONT_SUSPEND_NAME:
         print(name_of(app) + ' not resumed, in dont suspend list')
         return
 
@@ -92,7 +97,7 @@ def suspend_bg_apps():
             prev_app = app
         if prev_app and app != prev_app:
             suspend(prev_app)
-        resume(app) 
+        resume(app)
         prev_app = app
         time.sleep(0.7)
 
@@ -123,7 +128,7 @@ def init_bar(launchedApps):
     print('Launched apps:', appNames)
     desiredApps = set()
     teststring = "hello world"
-    
+
     rumpsClass = \
 '''class AwesomeStatusBarApp(rumps.App):
 '''
@@ -153,9 +158,9 @@ def main(launchedApps):
             thread = Thread(target=suspend_my_apps, args=my_app_names)
             try:
                 thread.start()
-            except:
+            except Exception:
                 print("Thread not working right")
-            AwesomeStatusBarApp("NapMyApp").run()
+            AwesomeStatusBarApp("NapMyApp").run()  # noqa
             thread.join()
         else:
             suspend_my_apps(my_app_names)
@@ -165,9 +170,10 @@ def main(launchedApps):
             print(appName)
         suspend_bg_apps()
 
+
 if __name__ == '__main__':
     try:
-        launchedApps  = NSWorkspace.sharedWorkspace().launchedApplications()
+        launchedApps = NSWorkspace.sharedWorkspace().launchedApplications()
         if useRumps:
             exec(init_bar(launchedApps))
         main(launchedApps)
@@ -175,4 +181,3 @@ if __name__ == '__main__':
         print('\nResuming all suspended apps')
         for pid in SUSPENDED:
             os.kill(int(pid), signal.SIGCONT)
-
