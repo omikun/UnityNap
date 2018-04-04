@@ -11,14 +11,14 @@ import rumps
 from threading import Thread
 
 try:
-  from AppKit import NSWorkspace
+    from AppKit import NSWorkspace
 except ImportError:
-  print("Can't import AppKit -- maybe you're running python from brew?")
-  print("Try running with Apple's /usr/bin/python instead.")
-  sys.exit(1)
+    print("Can't import AppKit -- maybe you're running python from brew?")
+    print("Try running with Apple's /usr/bin/python instead.")
+    sys.exit(1)
 
-SUSPENDED = set()  #set of PIDs that has been suspended
-DONT_SUSPEND_NAME = ('iTerm2', 'Terminal', 'Activity Monitor') #set of apps to never suspend/resume
+SUSPENDED = set()  # set of PIDs that has been suspended
+DONT_SUSPEND_NAME = ('iTerm2', 'Terminal', 'Activity Monitor')  # set of apps to never suspend/resume
 
 sucky_app_names = set()
 last_sucky_app_names = set()
@@ -30,15 +30,17 @@ nap_this_app = None
 menuStates = {}
 launchedApps = None
 
+
 def init_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
-            '%(asctime)s %(levelname)s %(name)s: %(message)s', '%b %d %H:%M:%S')
+        '%(asctime)s %(levelname)s %(name)s: %(message)s', '%b %d %H:%M:%S')
     stdout = logging.StreamHandler(sys.stdout)
     stdout.setFormatter(formatter)
     logger.addHandler(stdout)
     return logger
+
 
 def name_of(app):
     if app is None:
@@ -48,6 +50,7 @@ def name_of(app):
         # TODO handle errors instead of ignoring them
         app_name = app_name.encode("utf8", "ignore")
     return app_name
+
 
 def update_state(adding, appName):
     settings_updated[0] = True
@@ -65,6 +68,7 @@ def clearOtherStates(appName):
             continue
         v.state = False
 
+
 class ForceNapBarApp(rumps.App):
     @rumps.clicked('Quit')
     def myquit(self, sender):
@@ -72,18 +76,21 @@ class ForceNapBarApp(rumps.App):
         clean_exit()
         rumps.quit_application()
 
+
 def menu_item(appName):
     def helper(sender):
         sender.state = not sender.state
-        print ('clicked on', appName)
+        print('clicked on', appName)
         update_state(sender.state, appName)
+
     return helper
+
 
 def refresh_list(menu):
     def helper(sender):
         print('just clicked refresh')
         print('type of launchedApps:', type(launchedApps), type(launchedApps[0]))
-        #launchedApps.sort(key=lambda x: name_of(x))
+        # launchedApps.sort(key=lambda x: name_of(x))
         for i, launchedApp in enumerate(launchedApps):
             appName = name_of(launchedApp)
             print('Adding', appName)
@@ -95,6 +102,7 @@ def refresh_list(menu):
             # this will keep adding
             menu.add(rumps.MenuItem(appName, callback=menu_item(appName)))
             # todo: must only add new apps and remove old ones
+
     return helper
 
 
@@ -104,9 +112,11 @@ def start_bar():
     app.menu.add(rumps.separator)
     app.run()
 
+
 def clean_exit():
     for pid in SUSPENDED:
         os.kill(int(pid), signal.SIGCONT)
+
 
 def get_pids(app):
     """Returns list of all process IDs for given application."""
@@ -119,6 +129,7 @@ def get_pids(app):
     except subprocess.CalledProcessError:
         pass
     return pids
+
 
 def suspend(prev_app):
     if name_of(prev_app) in DONT_SUSPEND_NAME:
@@ -133,7 +144,7 @@ def suspend(prev_app):
 
 def resume(app):
     'Resume apps that have been suspended and arent on the do not suspend list'
-    if name_of(app) in DONT_SUSPEND_NAME: 
+    if name_of(app) in DONT_SUSPEND_NAME:
         print(name_of(app) + ' not resumed, in dont suspend list')
         return
     pids = get_pids(app)
@@ -149,6 +160,7 @@ def resume(app):
         os.kill(int(pid), signal.SIGCONT)
     for pid in pids:
         os.kill(int(pid), signal.SIGCONT)
+
 
 def on_update_settings(launchedApps, cur_app):
     global last_sucky_app_names
@@ -169,7 +181,8 @@ def on_update_settings(launchedApps, cur_app):
             suspend(l_app)
         if name_of(l_app) in not_sucky:
             resume(l_app)
-        
+
+
 def my_app_nap():
     prev_app = None
     while True:
@@ -185,11 +198,12 @@ def my_app_nap():
             prev_app = cur_app
         time.sleep(0.5)
 
+
 if __name__ == '__main__':
     try:
         # TODO precaution: resume all launched apps in case last shutdown left some apps hanging
         logger = init_logger()
-        launchedApps  = NSWorkspace.sharedWorkspace().launchedApplications()
+        launchedApps = NSWorkspace.sharedWorkspace().launchedApplications()
         thread = Thread(target=my_app_nap)
         thread.start()
         start_bar()
@@ -198,4 +212,3 @@ if __name__ == '__main__':
         print('\nResuming all suspended apps')
         for pid in SUSPENDED:
             os.kill(int(pid), signal.SIGCONT)
-
