@@ -9,12 +9,11 @@ import os
 import signal
 import logging
 
-
 try:
     from AppKit import NSWorkspace
 except ImportError:
-    print('AppKit module not found, script should be run using system-default Python installations')
-    sys.exit(1)
+    NSWorkspace = None
+    raise ImportError('AppKit module not found, script should be run using system-default Python installations')
 
 SUSPENSION_WHITELIST = ['Terminal', 'Activity Monitor', 'iTerm2']  # set of apps to never suspend/resume
 suspended_pids = set()
@@ -33,51 +32,48 @@ class Application:
         self.name = instance['NSApplicationName'].encode('utf8', 'ignore')
         self.pid = instance['NSApplicationProcessIdentifier']
 
-
     def get_pids(self):
-        '''
+        """
         Returns all process IDs for a given application by name
         :return: pids {List[Int]} all process IDs association to that application
-        '''
+        """
         pids = [self.pid]
         try:
-            pids.extend([int(pid) for pid in subprocess.check_output(['pgrep', '-P %s' % self.pid]).split()])
+            pids.extend([int(this_pid) for this_pid in subprocess.check_output(['pgrep', '-P %s' % self.pid]).split()])
         except subprocess.CalledProcessError:
             pass
         return pids
 
-
     def suspend(self):
-        '''
+        """
         Suspend application and all processes associated with it
-        '''
+        """
         if self.name in SUSPENSION_WHITELIST:
             return
 
-        for pid in self.get_pids():
-            if pid not in suspended_pids:
+        for this_pid in self.get_pids():
+            if this_pid not in suspended_pids:
                 logger.debug('Suspending %s (%s)', self.pid, self.name)
-                suspended_pids.add(pid)
-                os.kill(pid, signal.SIGSTOP)
+                suspended_pids.add(this_pid)
+                os.kill(this_pid, signal.SIGSTOP)
         return
 
-
     def resume(self):
-        '''
+        """
         Resume application and all processes associated with it
-        '''
-        for pid in self.get_pids():
-            if pid in suspended_pids:
+        """
+        for this_pid in self.get_pids():
+            if this_pid in suspended_pids:
                 logger.debug('Resuming %s (%s)', self.pid, self.name)
-                suspended_pids.discard(pid)
-                os.kill(pid, signal.SIGCONT)
+                suspended_pids.discard(this_pid)
+                os.kill(this_pid, signal.SIGCONT)
         return
 
 
 def suspend_background_apps():
-    '''
+    """
     Suspends all apps except app in focus
-    '''
+    """
     previous_app = None
     while True:
         app = Application(NSWorkspace.sharedWorkspace().activeApplication())
@@ -91,10 +87,10 @@ def suspend_background_apps():
 
 
 def suspend_apps(app_names):
-    '''
+    """
     Suspend apps of given names
-    :param app_names: {List[String]} list of app names 
-    '''
+    :param app_names: {List[String]} list of app names
+    """
     previous_app = None
     while True:
         app = Application(NSWorkspace.sharedWorkspace().activeApplication())
