@@ -1,4 +1,5 @@
-# ForceNap
+# ForceNap <img src="/img/Icon.png" width="32" height="32" />
+
 Useful for times when you want to keep a battery-hogging application running in the background to switch to intermittently, but don't want to pay the battery penalty of keeping it running when you don't need it. Examples include Unity, Matlab, Civilization, etc.
 
 - Force one or more apps to stop when not in focus and resumes each app when they regain focus.
