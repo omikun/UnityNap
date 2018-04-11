@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 
-python src/setup.py py2app
+cd src
+python setup.py py2app
