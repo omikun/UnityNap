@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from threading import Thread
+
 from six import string_types
 
 import rumps
@@ -20,18 +21,51 @@ except ImportError:
     raise ImportError("Can't import AppKit -- maybe you're running python from brew? \n "
                       "Try running with Apple's /usr/bin/python instead.")
 
-SUSPENDED = set()  # set of PIDs that has been suspended
+DO_NOT_SUSPEND_BY_NAME = ('iTerm2', 'Terminal', 'Activity Monitor')
+DO_NOT_SUSPEND_BY_PID = set()
+DEBUG = False
 
-DONT_SUSPEND_NAME = ('iTerm2', 'Terminal', 'Activity Monitor')  # set of apps to never suspend/resume
-
+suspended = set()  # set of PIDs that has been suspended
 bad_app_names = set()
 last_bad_app_names = set()
 settings_updated = [False]
+
 # If user changes one or more settings in 1 tick, in next tick, Resume everything not selected, suspend everything 
 # selected (except active app)
 nap_this_app = None
 menuStates = {}
-launchedApps = None
+launched_apps = None
+
+
+class ForceNapBarApp(rumps.App):
+    def __init__(self):
+        super(ForceNapBarApp, self).__init__("FN", quit_button=None)
+        self.refresh_button()
+
+    # FIXME Not being triggered for some reason
+    @rumps.clicked("Refresh...")
+    def refresh_button(self):
+        print("Refreshing application list...")
+        print("Type of launchedApps: ", type(launched_apps), type(launched_apps[0]))
+        for i, launchedApp in enumerate(launched_apps):
+            app_name = name_of(launchedApp)
+            # TODO Check if the app is already in there
+            if app_name not in DO_NOT_SUSPEND_BY_NAME:
+                print("Adding ", app_name)
+                self.menu.add(rumps.MenuItem(app_name, callback=application_menu_item(app_name)))
+
+    # Parameter 'sender' needs to be there for rumps to be happy
+    # noinspection PyUnusedLocal
+    @rumps.clicked('Quit')
+    def my_quit(self, sender):
+        quit_clean()
+
+
+def quit_clean():
+    print('Quitting with cleanup...')
+    for this_pid in suspended:
+        os.kill(int(this_pid), signal.SIGCONT)
+    rumps.quit_application()
 
 
 def init_logger():
@@ -57,7 +91,6 @@ def name_of(app):
 
 def update_state(adding, app_name):
     settings_updated[0] = True
-    print("setting updated!!!!!")
     if adding:
         bad_app_names.add(app_name)
     else:
@@ -72,55 +105,14 @@ def clear_other_states(app_name):
         v.state = False
 
 
-class ForceNapBarApp(rumps.App):
-    # noinspection PyUnusedLocal
-    @rumps.clicked('Quit')
-    def my_quit(self, sender):
-        print('Quiting with cleanup')
-        clean_exit()
-        rumps.quit_application()
-
-
-def menu_item(app_name):
+def application_menu_item(app_name):
     def helper(sender):
         sender.state = not sender.state
-        print('clicked on', app_name)
+        if DEBUG:
+            print('Clicked on', app_name)
         update_state(sender.state, app_name)
 
     return helper
-
-
-def refresh_list(menu):
-    # noinspection PyUnusedLocal
-    def helper(sender):
-        print('just clicked refresh')
-        print('type of launchedApps:', type(launchedApps), type(launchedApps[0]))
-        # launchedApps.sort(key=lambda x: name_of(x))
-        for i, launchedApp in enumerate(launchedApps):
-            app_name = name_of(launchedApp)
-            print('Adding', app_name)
-            if app_name in DONT_SUSPEND_NAME:
-                continue
-            # this doesn't add after the first click
-            # menu.insert_before('Quit', rumps.MenuItem(appName,
-            #                                         callback=menu_item(appName)))
-            # this will keep adding
-            menu.add(rumps.MenuItem(app_name, callback=menu_item(app_name)))
-            # todo: must only add new apps and remove old ones
-
-    return helper
-
-
-def start_bar():
-    app = ForceNapBarApp('FN', quit_button=None)
-    app.menu.add(rumps.MenuItem('Refresh', callback=refresh_list(app.menu)))
-    app.menu.add(rumps.separator)
-    app.run()
-
-
-def clean_exit():
-    for this_pid in SUSPENDED:
-        os.kill(int(this_pid), signal.SIGCONT)
 
 
 def get_pids(app):
@@ -138,49 +130,51 @@ def get_pids(app):
 
 
 def suspend(prev_app):
-    if name_of(prev_app) in DONT_SUSPEND_NAME:
-        print(name_of(prev_app) + ' not suspended, in dont suspend list')
+    if name_of(prev_app) in DO_NOT_SUSPEND_BY_NAME:
+        if DEBUG:
+            print(name_of(prev_app) + ' not suspended, in do not suspend list')
         return
 
     pids = get_pids(prev_app)
     logger.debug('Suspending %s (%s)', pids, name_of(prev_app))
     for this_pid in pids:
-        SUSPENDED.add(this_pid)
+        suspended.add(this_pid)
         os.kill(int(this_pid), signal.SIGSTOP)
 
 
 def resume(app):
     # Resume apps that have been suspended and aren't on the do not suspend list
-    if name_of(app) in DONT_SUSPEND_NAME:
+    if name_of(app) in DO_NOT_SUSPEND_BY_NAME:
         print(name_of(app) + ' not resumed, in dont suspend list')
         return
     pids = get_pids(app)
     for this_pid in pids:
-        if this_pid in SUSPENDED:
+        if this_pid in suspended:
             break
     else:
         return
     # only resume pids that are suspended
     logger.debug('Resuming %s (%s)', pids, name_of(app))
     for this_pid in pids:
-        SUSPENDED.discard(this_pid)
+        suspended.discard(this_pid)
         os.kill(int(this_pid), signal.SIGCONT)
     for this_pid in pids:
         os.kill(int(this_pid), signal.SIGCONT)
 
 
-def on_update_settings(launched_apps, cur_app):
+def on_update_settings(apps, cur_app):
     global last_bad_app_names
     settings_updated[0] = False
     # resume all apps
     # suspend all sucky_app_names
-    print("updating settings:")
     new_sucky = bad_app_names - last_bad_app_names
     not_sucky = last_bad_app_names - bad_app_names
-    print(bad_app_names)
-    print(last_bad_app_names)
+    if DEBUG:
+        print("Updating settings:")
+        print(bad_app_names)
+        print(last_bad_app_names)
     last_bad_app_names = set(bad_app_names)
-    for l_app in launched_apps:
+    for l_app in apps:
         if l_app == cur_app:
             print(name_of(l_app), "is current app, skipping")
             continue
@@ -190,13 +184,13 @@ def on_update_settings(launched_apps, cur_app):
             resume(l_app)
 
 
-def my_app_nap():
+def run():
     prev_app = None
     while True:
         cur_app = NSWorkspace.sharedWorkspace().activeApplication()
         if settings_updated[0]:
-            print("settings update detected in my_app_nap()")
-            on_update_settings(launchedApps, cur_app)
+            print("Settings update detected in my_app_nap()")
+            on_update_settings(launched_apps, cur_app)
         if prev_app != cur_app:
             if cur_app['NSApplicationName'] in bad_app_names:
                 resume(cur_app)
@@ -207,15 +201,18 @@ def my_app_nap():
 
 
 if __name__ == '__main__':
+    # In the case that the thread is interrupted (which should generate a KeyboardInterrupt), resume all the apps
+    logger = init_logger()
+    launched_apps = NSWorkspace.sharedWorkspace().launchedApplications()
+
+    # The actual checking needs to be spun out into a separate thread, otherwise it'll be blocked by the running, and we
+    # can't spin out the rumps stuff since that demands that it be invoked form the main thread
+
     try:
-        # TODO precaution: resume all launched apps in case last shutdown left some apps hanging
-        logger = init_logger()
-        launchedApps = NSWorkspace.sharedWorkspace().launchedApplications()
-        thread = Thread(target=my_app_nap)
+        thread = Thread(target=run)
+        thread.setDaemon(True)
         thread.start()
-        start_bar()
-        thread.join()
+
+        ForceNapBarApp().run()
     except KeyboardInterrupt:
-        print('\nResuming all suspended apps')
-        for pid in SUSPENDED:
-            os.kill(int(pid), signal.SIGCONT)
+        quit_clean()
