@@ -40,21 +40,28 @@ launched_apps = None
 # Parameter 'sender' needs to be there for rumps to be happy
 # noinspection PyUnusedLocal
 class ForceNapBarApp(rumps.App):
+
     def __init__(self):
         super(ForceNapBarApp, self).__init__("FN", quit_button=None)
-        self.refresh_button(None)
+        self.application_menu = rumps.MenuItem("Applications")
+        self.menu.add(self.application_menu)
+        self.add_all_applications()
 
-    # FIXME Not being triggered for some reason
+    def add_all_applications(self):
+        for i, launchedApp in enumerate(launched_apps):
+            app_name = name_of(launchedApp)
+            if app_name not in DO_NOT_SUSPEND_BY_NAME:
+                if DEBUG:
+                    print("Adding", app_name)
+                new_item = rumps.MenuItem(app_name, callback=application_menu_item(app_name))
+                self.application_menu.add(new_item)
+
     @rumps.clicked("Refresh...")
     def refresh_button(self, sender):
         print("Refreshing application list...")
         print("Type of launchedApps: ", type(launched_apps), type(launched_apps[0]))
-        for i, launchedApp in enumerate(launched_apps):
-            app_name = name_of(launchedApp)
-            # TODO Check if the app is already in there
-            if app_name not in DO_NOT_SUSPEND_BY_NAME:
-                print("Adding ", app_name)
-                self.menu.add(rumps.MenuItem(app_name, callback=application_menu_item(app_name)))
+        self.application_menu.clear()
+        self.add_all_applications()
 
     @rumps.clicked('Quit')
     def my_quit(self, sender):
@@ -179,6 +186,8 @@ def on_update_settings(apps, cur_app):
 def run():
     prev_app = None
     while True:
+        global launched_apps
+        launched_apps = NSWorkspace.sharedWorkspace().launchedApplications()
         cur_app = NSWorkspace.sharedWorkspace().activeApplication()
         if settings_updated[0]:
             print("Settings update detected in my_app_nap()")
