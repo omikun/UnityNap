@@ -18,7 +18,7 @@ try:
     from AppKit import NSWorkspace
 except ImportError:
     NSWorkspace = None
-    raise ImportError("Can't import AppKit -- maybe you're running python from brew? \n "
+    raise ImportError("Can't import AppKit, maybe you're running python from brew? \n "
                       "Try running with Apple's /usr/bin/python instead.")
 
 DO_NOT_SUSPEND_BY_NAME = ('iTerm2', 'Terminal', 'Activity Monitor')
@@ -37,14 +37,16 @@ menuStates = {}
 launched_apps = None
 
 
+# Parameter 'sender' needs to be there for rumps to be happy
+# noinspection PyUnusedLocal
 class ForceNapBarApp(rumps.App):
     def __init__(self):
         super(ForceNapBarApp, self).__init__("FN", quit_button=None)
-        self.refresh_button()
+        self.refresh_button(None)
 
     # FIXME Not being triggered for some reason
     @rumps.clicked("Refresh...")
-    def refresh_button(self):
+    def refresh_button(self, sender):
         print("Refreshing application list...")
         print("Type of launchedApps: ", type(launched_apps), type(launched_apps[0]))
         for i, launchedApp in enumerate(launched_apps):
@@ -54,8 +56,6 @@ class ForceNapBarApp(rumps.App):
                 print("Adding ", app_name)
                 self.menu.add(rumps.MenuItem(app_name, callback=application_menu_item(app_name)))
 
-    # Parameter 'sender' needs to be there for rumps to be happy
-    # noinspection PyUnusedLocal
     @rumps.clicked('Quit')
     def my_quit(self, sender):
         quit_clean()
@@ -95,14 +95,6 @@ def update_state(adding, app_name):
         bad_app_names.add(app_name)
     else:
         bad_app_names.discard(app_name)
-
-
-def clear_other_states(app_name):
-    # only used for keeping only 1 app monitored at a time
-    for k, v in menuStates.items():
-        if k == app_name:
-            continue
-        v.state = False
 
 
 def application_menu_item(app_name):
