@@ -22,7 +22,6 @@ except ImportError:
                       "Try running with Apple's /usr/bin/python instead.")
 
 DO_NOT_SUSPEND_BY_NAME = ('iTerm2', 'Terminal', 'Activity Monitor')
-DO_NOT_SUSPEND_BY_PID = set()
 DEBUG = False
 
 suspended = set()  # set of PIDs that has been suspended
@@ -63,13 +62,13 @@ class ForceNapBarApp(rumps.App):
         self.application_menu.clear()
         self.add_all_applications()
 
-    @rumps.clicked('Quit')
+    @rumps.clicked("Quit")
     def my_quit(self, sender):
         quit_clean()
 
 
 def quit_clean():
-    print('Quitting with cleanup...')
+    print("Quitting with cleanup...")
     for this_pid in suspended:
         os.kill(int(this_pid), signal.SIGCONT)
     rumps.quit_application()
@@ -108,7 +107,7 @@ def application_menu_item(app_name):
     def helper(sender):
         sender.state = not sender.state
         if DEBUG:
-            print('Clicked on', app_name)
+            print("Clicked on", app_name)
         update_state(sender.state, app_name)
 
     return helper
@@ -131,11 +130,11 @@ def get_pids(app):
 def suspend(prev_app):
     if name_of(prev_app) in DO_NOT_SUSPEND_BY_NAME:
         if DEBUG:
-            print(name_of(prev_app) + ' not suspended, in do not suspend list')
+            print(name_of(prev_app) + " not suspended, in do not suspend list")
         return
 
     pids = get_pids(prev_app)
-    logger.debug('Suspending %s (%s)', pids, name_of(prev_app))
+    logger.debug("Suspending %s (%s)", pids, name_of(prev_app))
     for this_pid in pids:
         suspended.add(this_pid)
         os.kill(int(this_pid), signal.SIGSTOP)
@@ -144,7 +143,7 @@ def suspend(prev_app):
 def resume(app):
     # Resume apps that have been suspended and aren't on the do not suspend list
     if name_of(app) in DO_NOT_SUSPEND_BY_NAME:
-        print(name_of(app) + ' not resumed, in dont suspend list')
+        print(name_of(app) + " not resumed, in do not suspend list")
         return
     pids = get_pids(app)
     for this_pid in pids:
@@ -153,7 +152,7 @@ def resume(app):
     else:
         return
     # only resume pids that are suspended
-    logger.debug('Resuming %s (%s)', pids, name_of(app))
+    logger.debug("Resuming %s (%s)", pids, name_of(app))
     for this_pid in pids:
         suspended.discard(this_pid)
         os.kill(int(this_pid), signal.SIGCONT)
