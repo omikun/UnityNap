@@ -52,6 +52,8 @@ class ForceNapBarApp(rumps.App):
             if app_name not in DO_NOT_SUSPEND_BY_NAME:
                 if DEBUG:
                     print("Adding", app_name)
+                # TODO Distinguish apps by energy consumption and ones that properly implement app nap
+                # TODO Get the icon of the application
                 new_item = rumps.MenuItem(app_name, callback=application_menu_item(app_name))
                 self.application_menu.add(new_item)
 
