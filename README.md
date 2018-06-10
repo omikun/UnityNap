@@ -1,4 +1,5 @@
-# ForceNap
+# ForceNap <img src="/img/Icon.png" width="32" height="32" />
+
 Useful for times when you want to keep a battery-hogging application running in the background to switch to intermittently, but don't want to pay the battery penalty of keeping it running when you don't need it. Examples include Unity, Matlab, Civilization, etc.
 
 - Force one or more apps to stop when not in focus and resumes each app when they regain focus.
@@ -12,7 +13,7 @@ This differs from App Nap which throttles and potentially stops apps, but only i
 ## Usage:
 - Download the pre-release [ForceNap](https://github.com/omikun/MyAppNap/releases)
 - Open and select the application(s) to force nap in the status bar (look for FN). 
-![Screen shot](/ForceNap_screen_shot.png)
+![Screen shot](/img/ForceNap_screen_shot.png)
 
 ## Limitations:
 - ForceNap does not support when target application spawns a new window.
